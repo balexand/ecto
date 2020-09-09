@@ -13,13 +13,14 @@ defmodule Ecto.Changeset.HasAssocTest do
     use Ecto.Schema
 
     schema "posts" do
+      field :field_with_default, :string, default: "default"
       field :title, :string
       belongs_to :author, Author
     end
 
     def changeset(schema, params) do
-      Changeset.cast(schema, params, ~w(title author_id)a)
-      |> Changeset.validate_required(:title)
+      Changeset.cast(schema, params, ~w(field_with_default title author_id)a)
+      |> Changeset.validate_required([:field_with_default, :title])
     end
 
     def set_action(schema, params) do
@@ -70,7 +71,7 @@ defmodule Ecto.Changeset.HasAssocTest do
     def optional_changeset(schema, params) do
       Changeset.cast(schema, params, ~w(name)a)
     end
-    
+
     def failing_changeset(schema, params, error_string) do
       Changeset.cast(schema, params, ~w(name)a)
       |> Changeset.add_error(:name, error_string)
@@ -258,7 +259,7 @@ defmodule Ecto.Changeset.HasAssocTest do
     assert profile.valid?
     assert changeset.valid?
   end
-  
+
   test "cast has_one with custom changeset specified with mfa" do
     changeset = cast(%Author{}, %{"profile" => %{}}, :profile, with: {Profile, :failing_changeset, ["test"]})
 
@@ -574,6 +575,14 @@ defmodule Ecto.Changeset.HasAssocTest do
     changeset = cast(schema, %{"nilify_posts" => [%{title: "Title"}]}, :nilify_posts)
     assert hd(changeset.changes.nilify_posts).data.id == 13
     assert hd(changeset.changes.nilify_posts).changes == %{title: "Title"}
+  end
+
+  test "cast has_many with default in associated schema" do
+    changeset = cast(%Author{}, %{"posts" => [%{"field_with_default" => ""}]}, :posts)
+    refute changeset.valid?
+    [post_change] = changeset.changes.posts
+    refute post_change.valid?
+    assert post_change.errors  == [{:field_with_default, {"can't be blank", [validation: :required]}}]
   end
 
   test "cast has_many with on_replace: :raise" do
